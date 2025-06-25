@@ -1,6 +1,4 @@
 fastapi
 uvicorn
-transformers
-torch
-pandas
-scikit-learn
+google-generativeai
+python-dotenv

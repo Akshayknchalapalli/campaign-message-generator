@@ -1,61 +1,68 @@
-from transformers import GPT2Tokenizer, GPT2LMHeadModel
-import torch
-from app.utils.data_loader import load_data, preprocess_data
-import pandas as pd
+from app.utils.google_ai_service import GoogleAIService
+from typing import Optional, List, Dict
 
 class MessageGenerator:
-    def __init__(self, model_name="gpt2" , data_path="app/data/real_estate_campaign_message_prompts.csv"):
-        self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.model = GPT2LMHeadModel.from_pretrained(model_name)
-        self.train_data = self.load_and_preprocess_data(data_path)
+    def __init__(self):
+        """Initialize the message generator with Google AI service"""
+        try:
+            self.google_ai_service = GoogleAIService()
+            self.is_initialized = True
+        except Exception as e:
+            print(f"Failed to initialize Google AI service: {e}")
+            self.is_initialized = False
 
-    def load_and_preprocess_data(self, data_path):
-        data = load_data(data_path)
-        train_data, _ = preprocess_data(data)
-        return pd.DataFrame(train_data)
-
-
-    def train(self):
-        # Concatenate prompt and message for each example
-        full_texts = [
-            prompt + self.tokenizer.eos_token + message + self.tokenizer.eos_token
-            for prompt, message in zip(self.train_data['prompt'], self.train_data['message'])
-        ]
-        inputs = self.tokenizer(full_texts, return_tensors="pt", padding=True, truncation=True)
-        labels = inputs['input_ids'].clone()
-
-        self.model.train()
-        optimizer = torch.optim.AdamW(self.model.parameters(), lr=5e-5)
-
-        for epoch in range(50):
-            optimizer.zero_grad()
-            outputs = self.model(**inputs, labels=labels)
-            loss = outputs.loss
-            loss.backward()
-            optimizer.step()
-            if (epoch + 1) % 10 == 0:
-                print(f"Epoch {epoch+1} loss: {loss.item():.4f}")
-
-    def generate_message(self, prompt):
-        self.model.eval()
-        inputs = self.tokenizer(prompt, return_tensors="pt")
-        input_ids = inputs["input_ids"]
-        attention_mask = inputs["attention_mask"]
+    def generate_message(self, prompt: str, industry: Optional[str] = None, 
+                        target_audience: Optional[str] = None, 
+                        tone: Optional[str] = None) -> str:
+        """
+        Generate a smart campaign message using Google AI
         
-        outputs = self.model.generate(
-            input_ids,
-            attention_mask=attention_mask,
-            max_length=100,
-            num_return_sequences=1,
-            pad_token_id=self.tokenizer.eos_token_id,
-            do_sample=True,
-            temperature=0.8,
-            top_p=0.9,
-            repetition_penalty=1.2,
-            no_repeat_ngram_size=3
+        Args:
+            prompt: The main prompt for the campaign message
+            industry: The industry context (e.g., real estate, e-commerce, etc.)
+            target_audience: The target audience description
+            tone: The desired tone (e.g., professional, friendly, urgent, etc.)
+        """
+        if not self.is_initialized:
+            return "Error: Google AI service not initialized. Please check your API key."
+        
+        return self.google_ai_service.generate_campaign_message(
+            prompt, industry, target_audience, tone
         )
-        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    def generate_multiple_variations(self, prompt: str, count: int = 3,
+                                   industry: Optional[str] = None,
+                                   target_audience: Optional[str] = None,
+                                   tone: Optional[str] = None) -> List[str]:
+        """
+        Generate multiple variations of a campaign message
+        """
+        if not self.is_initialized:
+            return ["Error: Google AI service not initialized. Please check your API key."]
+        
+        return self.google_ai_service.generate_multiple_variations(
+            prompt, count, industry, target_audience, tone
+        )
+
+    def analyze_message(self, message: str) -> Dict[str, str]:
+        """
+        Analyze the effectiveness of a campaign message
+        """
+        if not self.is_initialized:
+            return {
+                "message": message,
+                "analysis": "Error: Google AI service not initialized. Please check your API key."
+            }
+        
+        return self.google_ai_service.analyze_campaign_effectiveness(message)
+
+    def get_service_status(self) -> Dict[str, bool]:
+        """
+        Get the status of the Google AI service
+        """
+        return {
+            "is_initialized": self.is_initialized,
+            "api_available": self.is_initialized
+        }
 
 
